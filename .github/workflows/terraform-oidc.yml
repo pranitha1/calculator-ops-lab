@@ -29,20 +29,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # TEMPORARY DEBUG STEP - prints the real aud/sub claims from the
-      # actual OIDC token GitHub issues, so we can compare against the
-      # trust policy exactly instead of guessing. Not sensitive to log -
-      # these are identifying claims, not the signature/secret part.
-      - name: Debug OIDC token claims
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const token = await core.getIDToken('sts.amazonaws.com');
-            const payload = JSON.parse(Buffer.from(token.split('.')[1], 'base64').toString());
-            console.log('aud:', JSON.stringify(payload.aud));
-            console.log('sub:', JSON.stringify(payload.sub));
-            console.log('iss:', JSON.stringify(payload.iss));
-
       # This is the actual OIDC exchange: presents GitHub's token, AWS
       # checks it against the trust policy we built (repo + branch match),
       # returns short-lived credentials. No access key, no secret, anywhere.
