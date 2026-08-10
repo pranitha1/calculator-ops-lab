@@ -1,0 +1,67 @@
+name: Terraform - github-oidc stack
+
+on:
+  pull_request:
+    paths:
+      - 'github-oidc/**'
+  push:
+    branches:
+      - master
+    paths:
+      - 'github-oidc/**'
+
+# id-token: write is what lets this workflow request an OIDC token from
+# GitHub at all - without it, the AWS credentials step below fails.
+permissions:
+  id-token: write
+  contents: read
+  pull-requests: write
+
+jobs:
+  terraform:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: github-oidc
+    steps:
+      - uses: actions/checkout@v4
+
+      # This is the actual OIDC exchange: presents GitHub's token, AWS
+      # checks it against the trust policy we built (repo + branch match),
+      # returns short-lived credentials. No access key, no secret, anywhere.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::967226343548:role/github-actions-calculator-ops-lab
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@v3
+
+      - name: Terraform Init
+        run: terraform init
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -no-color
+        continue-on-error: true
+
+      # Only runs on a PR - this is what posts the plan output as a
+      # review-time comment, exactly the "reviewers see the infra diff
+      # before approving" pattern described earlier.
+      - name: Comment PR with Plan
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const output = `#### Terraform Plan\n\`\`\`\n${{ steps.plan.outputs.stdout }}\n\`\`\``;
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      # Only runs after a merge to master - never on a PR. This is the
+      # actual "apply on merge" half of the pattern.
+      - name: Terraform Apply
+        if: github.ref == 'refs/heads/master' && github.event_name == 'push'
+        run: terraform apply -auto-approve
