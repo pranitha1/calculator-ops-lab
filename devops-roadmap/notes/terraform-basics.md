@@ -22,6 +22,7 @@ for visibility into the full journey, not as a read-first reference.
 10. ⬜ `terraform import` — bringing already-existing infrastructure under Terraform control (directly relevant — we have real infra that was partly built by hand)
 11. ⬜ Workspaces — managing multiple environments from one config
 12. ⬜ Full destroy → apply cycle, timed
+13. ✅ GitHub Actions OIDC federation — built for real via Terraform (`github-oidc/main.tf`): `tls_certificate` data source, `aws_iam_openid_connect_provider`, a trust policy scoped to `repo:pranitha1/calculator-ops-lab:*`. Applied cleanly, 3 resources, real role ARN: `arn:aws:iam::967226343548:role/github-actions-calculator-ops-lab`
 
 ---
 
