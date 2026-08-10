@@ -26,9 +26,13 @@ data "tls_certificate" "github" {
 # One-time setup - every repo's workflows can potentially use it, access is
 # actually restricted per-role below, not here.
 resource "aws_iam_openid_connect_provider" "github" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
-  thumbprint_list = [data.tls_certificate.github.certificates[0].sha1_fingerprint]
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
+  # AWS wants the INTERMEDIATE CA's thumbprint here, not the root's. The
+  # certificate chain returned by this data source is ordered
+  # [root, intermediate, leaf] - index [0] (root) was the original bug;
+  # index [1] is the correct intermediate.
+  thumbprint_list = [data.tls_certificate.github.certificates[1].sha1_fingerprint]
 }
 
 # The trust policy: WHO is allowed to assume this role, and under what
@@ -52,10 +56,14 @@ data "aws_iam_policy_document" "github_actions_trust" {
 
     # THE critical line: restricts this role to workflows running from OUR
     # specific repo only. Without this, the trust would be far too broad.
+    # NOTE: GitHub appends immutable numeric IDs after the owner and repo
+    # name (e.g. "pranitha1@47051317") to prevent trust hijacking via
+    # account/repo renames - confirmed empirically by decoding a real
+    # token, not from documentation. The @* wildcards account for this.
     condition {
       test     = "StringLike"
       variable = "token.actions.githubusercontent.com:sub"
-      values   = ["repo:pranitha1/calculator-ops-lab:*"]
+      values   = ["repo:pranitha1@*/calculator-ops-lab@*:*"]
     }
   }
 }
@@ -63,6 +71,12 @@ data "aws_iam_policy_document" "github_actions_trust" {
 resource "aws_iam_role" "github_actions" {
   name               = "github-actions-calculator-ops-lab"
   assume_role_policy = data.aws_iam_policy_document.github_actions_trust.json
+
+  tags = {
+    Project   = "calculator-ops-lab"
+    ManagedBy = "Terraform"
+    Purpose   = "GitHub Actions OIDC federation"
+  }
 }
 
 # What the role can DO once assumed. Scoped to the specific services our
