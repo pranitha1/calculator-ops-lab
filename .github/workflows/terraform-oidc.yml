@@ -9,6 +9,9 @@ on:
       - master
     paths:
       - 'github-oidc/**'
+  # Lets us manually trigger a run anytime from the CLI/UI, regardless of
+  # the path filters above - useful for testing/debugging, like right now.
+  workflow_dispatch:
 
 # id-token: write is what lets this workflow request an OIDC token from
 # GitHub at all - without it, the AWS credentials step below fails.
